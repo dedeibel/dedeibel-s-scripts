@@ -1,8 +1,5 @@
 #!/usr/bin/perl -w
 #
-# Merges a couple of .pls playlist files into one
-# big m3u file.
-#
 # Copyright (c) 2008, Benjamin Peter <BenjaminPeter@arcor.de>
 # All rights reserved.
 #
@@ -39,51 +36,50 @@ if (@ARGV < 2) {
 my $outputFilename = shift;
 
 open OUT, "> $outputFilename" or die "Open: $!";
-
 print OUT "#EXTM3U\n";
 
-my $count = 0;
-my $errors = 0;
-
-my $number = 0;
-my $url;
-my $title;
+my %entries;
+my $expected_total = 0;
+my $playlists = 0;
 
 while (<>)
 {
-	chomp;
-	if (m#^File(\d+)=#) {
-		$url = $';
-		$url =~ tr/\x0D//d;
-	}
-	elsif (m#^Title(\d+)=#) {
-		$title = $';
-		$title =~ tr/\x0D//d;
-	}
-	else {
-		next;
-	}
+  chomp;
+	tr/\x0D//d;
+  
+  if (m#\[playlist\]#) {
+    $playlists++;
+  }
+  my ($key, $value) = split(/=/, $_);
+  next unless ($key && $value);
+  
+  if ($key eq 'NumberOfEntries') {
+    $expected_total += $value;
+  }
 
-	if ($number) {
-		if ($1 != $number) {
-			$errors++;
-			print STDERR "Warning, not matching pair found ($1)|($number) in $ARGV\n";
-		}
-	}
-	else {
-		$number = $1;
-	}
+  if ($key =~ m#File(\d+)#) {
+    $entries{"$playlists-$1"}->{file} = $value;
+  }
+  if ($key =~ m#Title(\d+)#) {
+    $entries{"$playlists-$1"}->{title} = $value;
+  }
+}
 
-	if ($url and $title) {
-		$count++;
-		$number = 0;
-		print ".";
-		print OUT "#EXTINF:-1,$title\n$url\n";
-		$title = undef;
-		$url = undef;
-	}
+local $| = 1;
+foreach my $entry (values %entries) {
+    if ($entry->{title} && $entry->{file}) {
+		  print ".";
+    }
+    elsif ($entry->{file}) {
+      print '/';
+      $entry->{title} = 'unkown';
+    }
+    else {
+      print "x";
+    }
+
+		printf OUT "#EXTINF:-1,%s\n%s\n", $entry->{title}, $entry->{file};
 }
 
 print "\n";
-print "Tracks found: $count\n";
-print "Errors:       $errors\n";
+print "Tracks found: ". scalar(keys %entries) ."\n";
