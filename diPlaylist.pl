@@ -36,8 +36,8 @@ use Cwd;
 # playlist, so just enter your player's command here, or
 # leave it false.
 #
-# $application = 'amarok';
-$application = '';
+$application = 'amarok';
+# $application = '';
 
 $tmp = '/tmp/diPlaylist';
 $threads = 3;
@@ -98,6 +98,7 @@ for ($t = 0; $t < $threads; ++$t)
       exit;
    }
 }
+`wget "http://metal-only.de/listen.pls"`;
 while (wait() != -1) {};
 print "+++ Children done, creating m3u playlist.\n";
 `mergePlaylists.pl distreams.m3u *.pls*`;
