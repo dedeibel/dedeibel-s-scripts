@@ -49,12 +49,14 @@ function set_alsa_card {
     fi
   fi
   
-  CARDID=`grep $CARDIDENT $PROCFILE | cut -d' ' -f 2`
+  CARDID=$(grep $CARDIDENT $PROCFILE | cut -d' ' -f 2)
+  DATE=$(date)
   
   (
   cat <<HERE
 # Warning, this file is created by script - do not modify
 # or deal with lost changes.
+# Updated: $DATE
 
 pcm.!default {
   type hw
