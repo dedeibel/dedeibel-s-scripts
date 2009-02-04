@@ -56,6 +56,9 @@ function set_alsa_card {
   cat <<HERE
 # Warning, this file is created by script - do not modify
 # or deal with lost changes.
+#
+# This config makes '$CARDIDENT' the first card.
+#
 # Updated: $DATE
 
 pcm.!default {
