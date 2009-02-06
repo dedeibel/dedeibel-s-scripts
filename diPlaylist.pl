@@ -101,7 +101,7 @@ for ($t = 0; $t < $threads; ++$t)
 `wget "http://metal-only.de/listen.pls"`;
 while (wait() != -1) {};
 print "+++ Children done, creating m3u playlist.\n";
-`mergePlaylists.pl distreams.m3u *.pls*`;
+`merge_pls_to_m3u.pl distreams.m3u *.pls*`;
 if ($application) {
   `$application distreams.m3u`;
 }
