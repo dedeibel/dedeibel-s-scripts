@@ -33,6 +33,8 @@ if (@ARGV < 2) {
 	exit 0;
 }
 
+my $sort = 1;
+
 my $outputFilename = shift;
 
 open OUT, "> $outputFilename" or die "Open: $!";
@@ -65,8 +67,16 @@ while (<>)
   }
 }
 
+my @entries;
+if ($sort) {
+  @entries = sort { ($a->{title} || '') cmp ($b->{title} || '') } values %entries;
+}
+else {
+  @entries = values %entries;
+}
+
 local $| = 1;
-foreach my $entry (values %entries) {
+foreach my $entry (@entries) {
     if ($entry->{title} && $entry->{file}) {
 		  print ".";
     }
