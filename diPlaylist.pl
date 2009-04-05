@@ -28,6 +28,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+use LWP;
+use HTTP::Request;
+use HTTP::Response;
+use HTTP::Headers;
 use FileHandle;
 use Cwd;
 
@@ -36,80 +40,158 @@ use Cwd;
 # playlist, so just enter your player's command here, or
 # leave it false.
 #
-$application = 'amarok';
 # $application = '';
+
+my $user_agent = "Mozilla/5.0 (;;;;) Gecko/2009021906 Firefox/3.0.7";
 
 $tmp = '/tmp/diPlaylist';
 $threads = 3;
 $start=getcwd;
+
+sub main {
+  print "+++ Creating temp directory.\n";
+  mkdir $tmp;
+  if ( ! -d $tmp )
+  {
+      print "Could not create temp dir '$tmp'\n";
+      exit;
+  }
+  
+  chdir $tmp;
+  print "+++ Getting di.fm homepage.\n";
+  my $dipage = fetch_url('http://di.fm/');
+  die "Got an empty page from di.fm" unless $dipage;
+  print "+++ Finding .pls files.\n";
+  
+  $OUTFILES = [];
+  $count = 0;
+  $outfile = 0;
+  foreach (split("\n", $dipage))
+  {
+     if (m/href="(.*?mp3.*?.pls)"/)
+     {
+           $a = $1;
+           if (substr($a,0,1) eq "/")
+           {
+               $a = "http://di.fm" . $a;
+           }
+  
+          if ($outfile >= $threads) { $outfile = 0 };
+          push (@{$OUTFILES->[$outfile]}, $a);
+          ++$outfile;
+          ++$count;
+     }
+  }
+  print "+++ Download .pls files ($count) with $threads processes\n";
+  for ($t = 0; $t < $threads; ++$t)
+  {
+     if (fork == 0) {
+        print "*** download thread $t running.\n";
+        chdir $tmp;
+        get_files($OUTFILES->[$t]);
+        print "*** download thread $t done.\n";
+        exit;
+     }
+  }
+  get_files(["http://metal-only.de/listen.pls"]);
+  while (wait() != -1) {};
+  print "\n";
+  print "+++ Children done, creating m3u playlist.\n";
+  `merge_pls_to_m3u.pl distreams.m3u *.pls*`;
+  
+  print "+++ Done.\n";
+}
+
+sub fetch_url {
+  my ($url) = @_;
+
+  # Create a user agent object
+  use LWP::UserAgent;
+  $ua = LWP::UserAgent->new;
+  $ua->agent($user_agent);
+
+  # Create a request
+  my $req = HTTP::Request->new(GET => $url);
+
+  # Pass request to the user agent and get a response back
+  my $res = $ua->request($req);
+
+  # Check the outcome of the response
+  if ($res->is_success) {
+      return $res->content;
+  }
+  else {
+      die "Could not fetch '$url':", $res->status_line, "\n";
+  }
+}
+
+sub get_files {
+  my ($urls) = @_;
+
+  # Create a user agent object
+  use LWP::UserAgent;
+  $ua = LWP::UserAgent->new;
+  $ua->agent($user_agent);
+
+  foreach my $url (@$urls) {
+    # Create a request
+    my $req = HTTP::Request->new(GET => $url);
+
+    # Pass request to the user agent and get a response back
+    my $res = $ua->request($req);
+
+    # Check the outcome of the response
+    if ($res->is_success) {
+        local $| = 0;
+        next unless $res->content;
+        my $filename;
+        if ($url =~ m#/([^/]+)$#) {
+          $filename = $1;
+        }
+        else {
+          $filename = "rand-". rand() . ".pls";
+        }
+        open(OUT, ">".$filename) or die "Could not write temporary playlist to: ".$filename;
+        print OUT $res->content;
+        close OUT;
+        print ".";
+    }
+    else {
+        die "Could not fetch '$url':", $res->status_line, "\n";
+    }
+  }
+}
+
+#
+# Start
+#
+
 if ( -e $tmp)
 {
     print "Temp dir '$tmp' allready exists, exiting\n";
     exit;
 }
 
-print "+++ Creating temp directory.\n";
-mkdir $tmp;
-if ( ! -d $tmp )
-{
-    print "Could not create temp dir '$tmp'\n";
-    exit;
-}
-
-chdir $tmp;
-print "+++ Getting di.fm homepage.\n";
-`wget di.fm`;
-print "+++ Finding .pls files.\n";
-open(INFILE, '< index.html') or die "Could not open 'index.html'";
-
-@OUTFILES = [];
-for ($num = 0; $num < $threads; ++$num)
-{
-   $OUTFILES[$num] = new FileHandle;
-   $OUTFILES[$num]->open("> list-$num") or die "Could not open output file 'list-$num'";
-}
-$count = 0;
-$outfile = 0;
-while (<INFILE>)
-{
-   if (m/href="(.*?mp3.*?.pls)"/)
-   {
-         $a = $1;
-         if (substr($a,0,1) eq "/")
-         {
-             $a = "http://di.fm" . $a;
-         }
-
-        if ($outfile >= $threads) { $outfile = 0 };
-        $OUTFILES[$outfile]->print("$a\n");
-        ++$outfile;
-        ++$count;
-   }
-}
-foreach $a (@OUTFILES) { $a->close; }
-print "+++ Download .pls files ($count) with $threads processes\n";
-for ($t = 0; $t < $threads; ++$t)
-{
-   if (fork == 0) {
-      print "*** download thread $t running.\n";
-      chdir $tmp;
-      `wget -i list-$t`;
-      print "*** download thread $t done.\n";
-      exit;
-   }
-}
-`wget "http://metal-only.de/listen.pls"`;
-while (wait() != -1) {};
-print "+++ Children done, creating m3u playlist.\n";
-`merge_pls_to_m3u.pl distreams.m3u *.pls*`;
-if ($application) {
-  `$application distreams.m3u`;
+eval {
+  main();
+};
+if ($@) {
+  print STDERR "Exiting unexpectedly: $@\nSystem Error: $!\n";
 }
 else {
-  `mv $tmp/distreams.m3u $start`
+  if ($application) {
+    eval {
+      `$application distreams.m3u`;
+    };
+    if ($@) {
+     print STDERR "Exiting unexpectedly: $@\nSystem Error: $!\n";
+    }
+  }
+  else {
+    `mv $tmp/distreams.m3u $start`
+  }
 }
-
+  
 chdir "/tmp";
-`rm -rf "$tmp"`;
+`rm -rf "$tmp"`; 
 
-print "+++ Done.\n";
