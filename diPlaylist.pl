@@ -40,12 +40,12 @@ use Cwd;
 # playlist, so just enter your player's command here, or
 # leave it false.
 #
-# $application = '';
+# $application = 'amarok';
 
 my $user_agent = "Mozilla/5.0 (;;;;) Gecko/2009021906 Firefox/3.0.7";
 
 $tmp = '/tmp/diPlaylist';
-$threads = 3;
+$threads = 4;
 $start=getcwd;
 
 sub main {
@@ -89,7 +89,7 @@ sub main {
         print "*** download thread $t running.\n";
         chdir $tmp;
         get_files($OUTFILES->[$t]);
-        print "*** download thread $t done.\n";
+        print "\n*** download thread $t done.\n";
         exit;
      }
   }
@@ -142,7 +142,7 @@ sub get_files {
 
     # Check the outcome of the response
     if ($res->is_success) {
-        local $| = 0;
+        local $| = 1;
         next unless $res->content;
         my $filename;
         if ($url =~ m#/([^/]+)$#) {
