@@ -26,7 +26,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-CARDIDENT="emu10k1"
+CARDIDENT="intel"
 PROCFILE="/proc/asound/modules"
 ALSACONFIG="/etc/asound.conf"
 
@@ -81,8 +81,11 @@ case "$1" in
     ;;
   stop)
     ;;
+  list)
+    cat $PROCFILE
+    ;;
   *)
-    echo "Usage: $0 {start|stop}"
+    echo "Usage: $0 {start|stop|list}"
     exit 1
     ;;
 esac
